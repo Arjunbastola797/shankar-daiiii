@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import './App.css';
 
 type MenuCategory = 'Starters' | 'Main Course' | 'Desserts' | 'Drinks';
 type ReservationStatus = 'Pending' | 'Confirmed' | 'Completed' | 'Cancelled';
@@ -86,6 +87,30 @@ const DEFAULT_ADMIN: AdminCredentials = {
 
 const MENU_CATEGORIES: Array<'All' | MenuCategory> = ['All', 'Starters', 'Main Course', 'Desserts', 'Drinks'];
 
+/** Hero slideshow — food photography (Unsplash). Crossfade + slow zoom. */
+const HERO_FOOD_IMAGES = [
+  'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=2000&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=2000&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?q=80&w=2000&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?q=80&w=2000&auto=format&fit=crop',
+  'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=2000&auto=format&fit=crop',
+] as const;
+
+const TESTIMONIALS = [
+  {
+    quote: 'The menu changes often and it always feels fresh. Booking online took seconds.',
+    author: 'Priya K.',
+  },
+  {
+    quote: 'Warm service and honest portions — our favourite spot before a night out.',
+    author: 'Marco & Elena',
+  },
+  {
+    quote: 'They accommodated our group and dietary notes without fuss. Highly recommend.',
+    author: 'Samir T.',
+  },
+];
+
 const readFromStorage = <T,>(key: string, fallback: T): T => {
   try {
     const rawValue = localStorage.getItem(key);
@@ -94,6 +119,10 @@ const readFromStorage = <T,>(key: string, fallback: T): T => {
   } catch {
     return fallback;
   }
+};
+
+const scrollToId = (id: string) => {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 
 const App: React.FC = () => {
@@ -109,6 +138,7 @@ const App: React.FC = () => {
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+  const [navOpen, setNavOpen] = useState(false);
 
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
@@ -148,6 +178,26 @@ const App: React.FC = () => {
     localStorage.setItem(STORAGE_KEYS.admin, JSON.stringify(credentials));
   }, [credentials]);
 
+  const [appView, setAppView] = useState<'public' | 'admin'>('public');
+  const [tick, setTick] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setTick(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const adminOn = appView === 'admin' && isAdminLoggedIn;
+    document.body.classList.toggle('admin-mode', adminOn);
+    return () => document.body.classList.remove('admin-mode');
+  }, [appView, isAdminLoggedIn]);
+
+  useEffect(() => {
+    if (!isAdminLoggedIn && appView === 'admin') {
+      setAppView('public');
+    }
+  }, [isAdminLoggedIn, appView]);
+
   const filteredMenuItems = useMemo(() => {
     if (activeCategory === 'All') return menuItems;
     return menuItems.filter((item) => item.category === activeCategory);
@@ -163,6 +213,15 @@ const App: React.FC = () => {
       pendingReservations,
     };
   }, [menuItems, reservations]);
+
+  const recentReservations = useMemo(() => {
+    return [...reservations].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 8);
+  }, [reservations]);
+
+  const newBookingsToday = useMemo(() => {
+    const ymd = new Date().toISOString().slice(0, 10);
+    return reservations.filter((r) => r.date === ymd && r.status === 'Pending').length;
+  }, [reservations]);
 
   const updateReservationField = (field: keyof typeof reservationForm, value: string | number) => {
     setReservationForm((prev) => ({ ...prev, [field]: value }));
@@ -207,8 +266,9 @@ const App: React.FC = () => {
       setIsAdminLoggedIn(true);
       setShowAdminLogin(false);
       setLoginError('');
-      setNotice('Admin login successful.');
+      setNotice('Welcome — live dashboard opened.');
       setActiveTab('overview');
+      setAppView('admin');
       return;
     }
 
@@ -217,7 +277,8 @@ const App: React.FC = () => {
 
   const handleAdminLogout = () => {
     setIsAdminLoggedIn(false);
-    setNotice('Admin logged out.');
+    setAppView('public');
+    setNotice('Signed out of admin.');
   };
 
   const handleAddMenuItem = (event: React.FormEvent<HTMLFormElement>) => {
@@ -275,220 +336,163 @@ const App: React.FC = () => {
     setNotice('Admin credentials updated.');
   };
 
-  return (
-    <div className="page">
-      <header className="top-bar">
-        <div>
-          <h1>Bistro Delight</h1>
-          <p>Dynamic Restaurant Website</p>
-        </div>
-        <div className="top-actions">
-          {isAdminLoggedIn ? (
-            <button className="secondary-btn" onClick={handleAdminLogout}>
-              Logout Admin
-            </button>
-          ) : (
-            <button className="secondary-btn" onClick={() => setShowAdminLogin(true)}>
-              Admin Login
-            </button>
-          )}
-        </div>
-      </header>
+  const closeNav = () => setNavOpen(false);
 
-      <main>
-        <section className="hero section-card">
-          <div>
-            <h2>Fresh food, warm service, and an easy booking experience.</h2>
-            <p>
-              Customers can browse a dynamic menu and reserve tables online. Admin can log in to manage menu items,
-              reservations, and account settings from a dashboard.
-            </p>
-          </div>
-          <div className="hero-stats">
+  const clockTime = new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  }).format(new Date(tick));
+  const clockDate = new Intl.DateTimeFormat(undefined, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(tick));
+
+  if (appView === 'admin' && isAdminLoggedIn) {
+    const tabBtn = (id: DashboardTab, label: string) => (
+      <button
+        key={id}
+        type="button"
+        className={`admin-nav__btn ${activeTab === id ? 'admin-nav__btn--active' : ''}`}
+        onClick={() => setActiveTab(id)}
+      >
+        {label}
+      </button>
+    );
+
+    return (
+      <div className="admin-app">
+        <a className="skip-link" href="#admin-main">
+          Skip to dashboard
+        </a>
+        <aside className="admin-sidebar" aria-label="Admin navigation">
+          <div className="admin-sidebar__brand">
+            <span className="admin-sidebar__logo">GN</span>
             <div>
-              <strong>{dashboardStats.totalMenuItems}</strong>
-              <span>Menu Items</span>
-            </div>
-            <div>
-              <strong>{dashboardStats.totalReservations}</strong>
-              <span>Reservations</span>
+              <p className="admin-sidebar__title">Ghamau Nepal</p>
+              <p className="admin-sidebar__sub">Live console</p>
             </div>
           </div>
-        </section>
-
-        {notice && <p className="notice">{notice}</p>}
-
-        <section className="section-card">
-          <h3>Our Menu</h3>
-          <div className="category-row">
-            {MENU_CATEGORIES.map((category) => (
-              <button
-                key={category}
-                className={activeCategory === category ? 'chip active-chip' : 'chip'}
-                onClick={() => setActiveCategory(category)}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-
-          <div className="menu-grid">
-            {filteredMenuItems.map((item) => (
-              <article key={item.id} className="menu-card">
-                <div className="menu-header">
-                  <h4>{item.name}</h4>
-                  <span className={item.available ? 'tag available' : 'tag unavailable'}>
-                    {item.available ? 'Available' : 'Not Available'}
-                  </span>
-                </div>
-                <p>{item.description}</p>
-                <div className="menu-footer">
-                  <small>{item.category}</small>
-                  <strong>${item.price.toFixed(2)}</strong>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="section-card">
-          <h3>Book a Table</h3>
-          <form className="form-grid" onSubmit={handleReservationSubmit}>
-            <label>
-              Name *
-              <input
-                value={reservationForm.customerName}
-                onChange={(e) => updateReservationField('customerName', e.target.value)}
-                required
-              />
-            </label>
-            <label>
-              Phone *
-              <input value={reservationForm.phone} onChange={(e) => updateReservationField('phone', e.target.value)} required />
-            </label>
-            <label>
-              Date *
-              <input type="date" value={reservationForm.date} onChange={(e) => updateReservationField('date', e.target.value)} required />
-            </label>
-            <label>
-              Time *
-              <input type="time" value={reservationForm.time} onChange={(e) => updateReservationField('time', e.target.value)} required />
-            </label>
-            <label>
-              Guests
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={reservationForm.guests}
-                onChange={(e) => updateReservationField('guests', Number(e.target.value))}
-              />
-            </label>
-            <label className="full-width">
-              Special Request
-              <textarea
-                value={reservationForm.specialRequest}
-                onChange={(e) => updateReservationField('specialRequest', e.target.value)}
-                rows={3}
-              />
-            </label>
-            <button className="primary-btn full-width" type="submit">
-              Submit Reservation
+          <nav className="admin-nav">{tabBtn('overview', 'Overview')}{tabBtn('menu', 'Menu')}{tabBtn('reservations', 'Reservations')}{tabBtn('settings', 'Settings')}</nav>
+          <div className="admin-sidebar__foot">
+            <p className="admin-sidebar__user">Signed in as {credentials.username}</p>
+            <button type="button" className="admin-btn-ghost" onClick={() => setAppView('public')}>
+              View public site
             </button>
-          </form>
-        </section>
+            <button type="button" className="admin-btn-logout" onClick={handleAdminLogout}>
+              Sign out
+            </button>
+          </div>
+        </aside>
 
-        {isAdminLoggedIn && (
-          <section className="section-card">
-            <h3>Admin Dashboard</h3>
-            <div className="dashboard-tabs">
-              <button className={activeTab === 'overview' ? 'chip active-chip' : 'chip'} onClick={() => setActiveTab('overview')}>
-                Overview
-              </button>
-              <button className={activeTab === 'menu' ? 'chip active-chip' : 'chip'} onClick={() => setActiveTab('menu')}>
-                Manage Menu
-              </button>
-              <button className={activeTab === 'reservations' ? 'chip active-chip' : 'chip'} onClick={() => setActiveTab('reservations')}>
-                Reservations
-              </button>
-              <button className={activeTab === 'settings' ? 'chip active-chip' : 'chip'} onClick={() => setActiveTab('settings')}>
-                Settings
-              </button>
+        <div className="admin-workspace">
+          <header className="admin-topbar">
+            <div className="admin-topbar__live">
+              <span className="admin-live-pill" title="Local session — updates save to this device">
+                <span className="admin-live-pill__dot" aria-hidden />
+                Live
+              </span>
+              <div className="admin-topbar__clock">
+                <span className="admin-topbar__time">{clockTime}</span>
+                <span className="admin-topbar__date">{clockDate}</span>
+              </div>
             </div>
+            <div className="admin-topbar__meta">
+              {newBookingsToday > 0 && (
+                <span className="admin-badge-warn">{newBookingsToday} new today</span>
+              )}
+              <span className="admin-sync">Data sync · local</span>
+            </div>
+          </header>
+
+          <main id="admin-main" className="admin-main">
+            {notice && (
+              <div className="admin-toast" role="status">
+                {notice}
+              </div>
+            )}
 
             {activeTab === 'overview' && (
-              <div className="stats-grid">
-                <div className="stat-card">
-                  <h4>Total Menu Items</h4>
-                  <strong>{dashboardStats.totalMenuItems}</strong>
+              <div className="admin-panels">
+                <div className="admin-stat-grid">
+                  <div className="admin-stat">
+                    <span className="admin-stat__label">Menu items</span>
+                    <strong className="admin-stat__num">{dashboardStats.totalMenuItems}</strong>
+                  </div>
+                  <div className="admin-stat">
+                    <span className="admin-stat__label">Available</span>
+                    <strong className="admin-stat__num">{dashboardStats.availableItems}</strong>
+                  </div>
+                  <div className="admin-stat">
+                    <span className="admin-stat__label">Reservations</span>
+                    <strong className="admin-stat__num">{dashboardStats.totalReservations}</strong>
+                  </div>
+                  <div className="admin-stat admin-stat--accent">
+                    <span className="admin-stat__label">Pending</span>
+                    <strong className="admin-stat__num">{dashboardStats.pendingReservations}</strong>
+                  </div>
                 </div>
-                <div className="stat-card">
-                  <h4>Available Items</h4>
-                  <strong>{dashboardStats.availableItems}</strong>
-                </div>
-                <div className="stat-card">
-                  <h4>Total Reservations</h4>
-                  <strong>{dashboardStats.totalReservations}</strong>
-                </div>
-                <div className="stat-card">
-                  <h4>Pending Reservations</h4>
-                  <strong>{dashboardStats.pendingReservations}</strong>
-                </div>
+                <section className="admin-feed">
+                  <h2 className="admin-feed__title">Recent bookings</h2>
+                  {recentReservations.length === 0 ? (
+                    <p className="admin-feed__empty">No reservations yet — they appear here as guests book.</p>
+                  ) : (
+                    <ul className="admin-feed__list">
+                      {recentReservations.map((r) => (
+                        <li key={r.id} className="admin-feed__item">
+                          <span className={`admin-feed__status admin-feed__status--${r.status === 'Pending' ? 'pending' : 'ok'}`}>{r.status}</span>
+                          <span className="admin-feed__who">{r.customerName}</span>
+                          <span className="admin-feed__when">
+                            {r.date} · {r.time}
+                          </span>
+                          <span className="admin-feed__guests">{r.guests} pax</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
               </div>
             )}
 
             {activeTab === 'menu' && (
-              <div className="admin-grid">
-                <form className="stacked-form" onSubmit={handleAddMenuItem}>
-                  <h4>Add New Menu Item</h4>
+              <div className="admin-panels admin-panels--split">
+                <form className="admin-card admin-form" onSubmit={handleAddMenuItem}>
+                  <h2 className="admin-card__h">Add menu item</h2>
                   <input
                     placeholder="Item name"
                     value={menuDraft.name}
                     onChange={(e) => setMenuDraft((prev) => ({ ...prev, name: e.target.value }))}
                   />
-                  <textarea
-                    rows={3}
-                    placeholder="Description"
-                    value={menuDraft.description}
-                    onChange={(e) => setMenuDraft((prev) => ({ ...prev, description: e.target.value }))}
-                  />
-                  <select
-                    value={menuDraft.category}
-                    onChange={(e) => setMenuDraft((prev) => ({ ...prev, category: e.target.value as MenuCategory }))}
-                  >
+                  <textarea rows={3} placeholder="Description" value={menuDraft.description} onChange={(e) => setMenuDraft((prev) => ({ ...prev, description: e.target.value }))} />
+                  <select value={menuDraft.category} onChange={(e) => setMenuDraft((prev) => ({ ...prev, category: e.target.value as MenuCategory }))}>
                     <option>Starters</option>
                     <option>Main Course</option>
                     <option>Desserts</option>
                     <option>Drinks</option>
                   </select>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    placeholder="Price"
-                    value={menuDraft.price}
-                    onChange={(e) => setMenuDraft((prev) => ({ ...prev, price: e.target.value }))}
-                  />
-                  <button className="primary-btn" type="submit">
-                    Add Item
+                  <input type="number" step="0.01" min="0.01" placeholder="Price" value={menuDraft.price} onChange={(e) => setMenuDraft((prev) => ({ ...prev, price: e.target.value }))} />
+                  <button className="admin-btn-primary" type="submit">
+                    Publish to menu
                   </button>
                 </form>
-
-                <div className="list-panel">
-                  <h4>Current Menu Items</h4>
+                <div className="admin-card admin-list">
+                  <h2 className="admin-card__h">Live menu</h2>
                   {menuItems.map((item) => (
-                    <div className="list-row" key={item.id}>
+                    <div className="admin-list__row" key={item.id}>
                       <div>
                         <strong>{item.name}</strong>
                         <p>
-                          {item.category} • ${item.price.toFixed(2)}
+                          {item.category} · ${item.price.toFixed(2)}
                         </p>
                       </div>
-                      <div className="row-actions">
-                        <button className="small-btn" onClick={() => toggleMenuItemAvailability(item.id)}>
-                          {item.available ? 'Mark Unavailable' : 'Mark Available'}
+                      <div className="admin-list__actions">
+                        <button type="button" className="admin-btn-small" onClick={() => toggleMenuItemAvailability(item.id)}>
+                          {item.available ? 'Unavailable' : 'Available'}
                         </button>
-                        <button className="small-btn danger" onClick={() => deleteMenuItem(item.id)}>
+                        <button type="button" className="admin-btn-small admin-btn-small--danger" onClick={() => deleteMenuItem(item.id)}>
                           Delete
                         </button>
                       </div>
@@ -499,167 +503,352 @@ const App: React.FC = () => {
             )}
 
             {activeTab === 'reservations' && (
-              <div className="list-panel">
-                <h4>Reservation Requests</h4>
-                {reservations.length === 0 && <p>No reservations yet.</p>}
+              <div className="admin-card admin-list admin-list--wide">
+                <h2 className="admin-card__h">All reservations</h2>
+                {reservations.length === 0 && <p className="admin-feed__empty">No reservations yet.</p>}
                 {reservations.map((reservation) => (
-                  <div className="list-row" key={reservation.id}>
+                  <div className="admin-list__row" key={reservation.id}>
                     <div>
                       <strong>{reservation.customerName}</strong>
                       <p>
-                        {reservation.date} at {reservation.time} • {reservation.guests} guests • {reservation.phone}
+                        {reservation.date} at {reservation.time} · {reservation.guests} guests · {reservation.phone}
                       </p>
-                      {reservation.specialRequest && <p>Request: {reservation.specialRequest}</p>}
+                      {reservation.specialRequest && <p className="admin-list__note">Note: {reservation.specialRequest}</p>}
                     </div>
-                    <div className="row-actions">
-                      <select
-                        value={reservation.status}
-                        onChange={(e) => updateReservationStatus(reservation.id, e.target.value as ReservationStatus)}
-                      >
-                        <option>Pending</option>
-                        <option>Confirmed</option>
-                        <option>Completed</option>
-                        <option>Cancelled</option>
-                      </select>
-                    </div>
+                    <select
+                      className="admin-select"
+                      value={reservation.status}
+                      onChange={(e) => updateReservationStatus(reservation.id, e.target.value as ReservationStatus)}
+                    >
+                      <option>Pending</option>
+                      <option>Confirmed</option>
+                      <option>Completed</option>
+                      <option>Cancelled</option>
+                    </select>
                   </div>
                 ))}
               </div>
             )}
 
             {activeTab === 'settings' && (
-              <form className="stacked-form max-form-width" onSubmit={handleSettingsUpdate}>
-                <h4>Update Admin Credentials</h4>
+              <form className="admin-card admin-form admin-form--narrow" onSubmit={handleSettingsUpdate}>
+                <h2 className="admin-card__h">Credentials</h2>
                 <label>
                   Username
-                  <input
-                    value={settingsDraft.username}
-                    onChange={(e) => setSettingsDraft((prev) => ({ ...prev, username: e.target.value }))}
-                  />
+                  <input value={settingsDraft.username} onChange={(e) => setSettingsDraft((prev) => ({ ...prev, username: e.target.value }))} />
                 </label>
                 <label>
                   Password
-                  <input
-                    type="password"
-                    value={settingsDraft.password}
-                    onChange={(e) => setSettingsDraft((prev) => ({ ...prev, password: e.target.value }))}
-                  />
+                  <input type="password" value={settingsDraft.password} onChange={(e) => setSettingsDraft((prev) => ({ ...prev, password: e.target.value }))} />
                 </label>
                 <label>
-                  Confirm Password
-                  <input
-                    type="password"
-                    value={settingsDraft.confirmPassword}
-                    onChange={(e) => setSettingsDraft((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-                  />
+                  Confirm password
+                  <input type="password" value={settingsDraft.confirmPassword} onChange={(e) => setSettingsDraft((prev) => ({ ...prev, confirmPassword: e.target.value }))} />
                 </label>
-                <button className="primary-btn" type="submit">
-                  Save Credentials
+                <button className="admin-btn-primary" type="submit">
+                  Save
                 </button>
               </form>
             )}
-          </section>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="site">
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
+
+      <header className="site-header">
+        <nav className="site-nav" aria-label="Primary">
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-expanded={navOpen}
+            aria-controls="nav-menu"
+            onClick={() => setNavOpen((o) => !o)}
+          >
+            <span className="nav-toggle-bar" />
+            <span className="nav-toggle-bar" />
+            <span className="nav-toggle-bar" />
+            <span className="sr-only">Menu</span>
+          </button>
+
+          <a className="nav-logo font-serif" href="#" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
+            Ghamau Nepal
+          </a>
+
+          <ul id="nav-menu" className={`nav-links ${navOpen ? 'nav-links--open' : ''}`}>
+            <li>
+              <a href="#menu" onClick={closeNav}>
+                Menu
+              </a>
+            </li>
+            <li>
+              <a href="#book" onClick={closeNav}>
+                Book
+              </a>
+            </li>
+            <li>
+              <a href="#testimonials" onClick={closeNav}>
+                Testimonials
+              </a>
+            </li>
+            <li>
+              <a href="#contact" onClick={closeNav}>
+                Contact
+              </a>
+            </li>
+          </ul>
+
+          <div className="nav-actions">
+            {isAdminLoggedIn ? (
+              <>
+                <button type="button" className="nav-link-btn" onClick={() => { setAppView('admin'); closeNav(); }}>
+                  Dashboard
+                </button>
+                <button type="button" className="nav-link-btn" onClick={handleAdminLogout}>
+                  Logout
+                </button>
+              </>
+            ) : (
+              <button type="button" className="nav-link-btn" onClick={() => setShowAdminLogin(true)}>
+                Admin
+              </button>
+            )}
+            <button type="button" className="btn-cta-nav" onClick={() => { scrollToId('book'); closeNav(); }}>
+              Book your table
+            </button>
+          </div>
+        </nav>
+      </header>
+
+      <main id="main-content" className="site-main">
+        <section className="hero-hero" aria-labelledby="hero-heading">
+          <div className="hero-hero__bg" aria-hidden="true">
+            {HERO_FOOD_IMAGES.map((src, index) => (
+              <div key={src} className="hero-hero__slide" style={{ backgroundImage: `url(${src})` }} data-slide={index} />
+            ))}
+            <div className="hero-hero__gradient" />
+          </div>
+          <div className="hero-hero__inner site-inner">
+            <p className="hero-hero__kicker">This is Ghamau Nepal</p>
+            <h1 id="hero-heading" className="hero-hero__title font-serif">
+              We&apos;ve grown — our welcome is the same.
+            </h1>
+            <p className="hero-hero__sub">
+              A dynamic menu, instant table requests, and an admin dashboard for your team. Guests see what you publish; you
+              control it after login.
+            </p>
+            <div className="hero-hero__cta">
+              <button type="button" className="btn-cta-hero" onClick={() => scrollToId('book')}>
+                Book your table
+              </button>
+              <button type="button" className="btn-ghost-hero" onClick={() => scrollToId('menu')}>
+                View menu
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {notice && (
+          <div className="site-inner notice-banner" role="status">
+            {notice}
+          </div>
         )}
+
+        <section id="menu" className="section-block section-menu">
+          <div className="site-inner">
+            <header className="section-intro">
+              <h2 className="section-intro__title font-serif">Menu</h2>
+              <p className="section-intro__lede">Dishes and prices update live when staff edit them in the admin panel.</p>
+            </header>
+
+            <div className="category-row">
+              {MENU_CATEGORIES.map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  className={activeCategory === category ? 'chip chip--active' : 'chip'}
+                  onClick={() => setActiveCategory(category)}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+
+            <div className="menu-grid">
+              {filteredMenuItems.map((item) => (
+                <article key={item.id} className="menu-card">
+                  <div className="menu-card__top">
+                    <h3 className="menu-card__name">{item.name}</h3>
+                    <span className={item.available ? 'tag tag--ok' : 'tag tag--off'}>
+                      {item.available ? 'Available' : 'Unavailable'}
+                    </span>
+                  </div>
+                  <p className="menu-card__desc">{item.description}</p>
+                  <div className="menu-card__meta">
+                    <span className="menu-card__cat">{item.category}</span>
+                    <span className="menu-card__price">${item.price.toFixed(2)}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="testimonials" className="section-block section-testimonials">
+          <div className="site-inner">
+            <header className="section-intro section-intro--center">
+              <h2 className="section-intro__title font-serif">Testimonials</h2>
+              <p className="section-intro__lede">What guests say — your real reviews can replace these anytime.</p>
+            </header>
+            <div className="testimonial-grid">
+              {TESTIMONIALS.map((t) => (
+                <blockquote key={t.author} className="testimonial-card">
+                  <p className="testimonial-card__quote">&ldquo;{t.quote}&rdquo;</p>
+                  <footer className="testimonial-card__by">— {t.author}</footer>
+                </blockquote>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="book" className="section-block section-book">
+          <div className="site-inner section-book__grid">
+            <div className="section-book__copy">
+              <h2 className="section-intro__title font-serif">Book your table</h2>
+              <p className="section-intro__lede">
+                Reserve in a few steps — same flow your team sees in the live dashboard. We&apos;ll confirm by phone.
+              </p>
+            </div>
+            <form className="book-form" onSubmit={handleReservationSubmit}>
+              <label>
+                Name *
+                <input
+                  value={reservationForm.customerName}
+                  onChange={(e) => updateReservationField('customerName', e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Phone *
+                <input value={reservationForm.phone} onChange={(e) => updateReservationField('phone', e.target.value)} required />
+              </label>
+              <label>
+                Date *
+                <input type="date" value={reservationForm.date} onChange={(e) => updateReservationField('date', e.target.value)} required />
+              </label>
+              <label>
+                Time *
+                <input type="time" value={reservationForm.time} onChange={(e) => updateReservationField('time', e.target.value)} required />
+              </label>
+              <label>
+                Guests
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={reservationForm.guests}
+                  onChange={(e) => updateReservationField('guests', Number(e.target.value))}
+                />
+              </label>
+              <label className="book-form__full">
+                Special request
+                <textarea
+                  value={reservationForm.specialRequest}
+                  onChange={(e) => updateReservationField('specialRequest', e.target.value)}
+                  rows={3}
+                />
+              </label>
+              <button className="btn-cta-hero book-form__submit" type="submit">
+                Submit reservation
+              </button>
+            </form>
+          </div>
+        </section>
       </main>
 
+      <footer id="contact" className="site-footer">
+        <div className="site-inner site-footer__grid">
+          <div>
+            <p className="site-footer__brand font-serif">Ghamau Nepal</p>
+            <p className="site-footer__text">
+              Inspired by the clarity of classic restaurant sites — dynamic menu and booking, with a secure admin area for your team.
+            </p>
+          </div>
+          <div>
+            <h3 className="site-footer__heading">Sitemap</h3>
+            <ul className="site-footer__links">
+              <li>
+                <a href="#menu">Menu</a>
+              </li>
+              <li>
+                <a href="#book">Book</a>
+              </li>
+              <li>
+                <a href="#testimonials">Testimonials</a>
+              </li>
+              <li>
+                {isAdminLoggedIn ? (
+                  <button type="button" className="site-footer__link-btn" onClick={() => setAppView('admin')}>
+                    Dashboard
+                  </button>
+                ) : (
+                  <button type="button" className="site-footer__link-btn" onClick={() => setShowAdminLogin(true)}>
+                    Admin login
+                  </button>
+                )}
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h3 className="site-footer__heading">Contact</h3>
+            <p className="site-footer__text">Replace with your phone, email, and hours.</p>
+            <p className="site-footer__muted">© {new Date().getFullYear()} Ghamau Nepal</p>
+          </div>
+        </div>
+      </footer>
+
       {showAdminLogin && (
-        <div className="modal-overlay" onClick={() => setShowAdminLogin(false)}>
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-login-title"
+          onClick={() => setShowAdminLogin(false)}
+        >
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <h3>Admin Login</h3>
-            <p>Use your admin credentials to access the dashboard.</p>
+            <h2 id="admin-login-title" className="modal-card__title font-serif">
+              Admin login
+            </h2>
+            <p className="modal-card__lede">Sign in to manage menu, reservations, and settings.</p>
             <form className="stacked-form" onSubmit={handleAdminLogin}>
               <input
                 placeholder="Username"
                 value={loginForm.username}
                 onChange={(e) => setLoginForm((prev) => ({ ...prev, username: e.target.value }))}
+                autoComplete="username"
               />
               <input
                 type="password"
                 placeholder="Password"
                 value={loginForm.password}
                 onChange={(e) => setLoginForm((prev) => ({ ...prev, password: e.target.value }))}
+                autoComplete="current-password"
               />
-              {loginError && <p className="error-text">{loginError}</p>}
-              <button className="primary-btn" type="submit">
+              {loginError && <p className="form-error">{loginError}</p>}
+              <button className="btn-cta-hero" type="submit">
                 Login
               </button>
             </form>
-            <small>Default demo login: admin / admin123</small>
+            <p className="modal-card__hint">Demo: admin / admin123</p>
           </div>
         </div>
       )}
-
-      <style>{`
-        * { box-sizing: border-box; }
-        body { margin: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #f5f7fb; color: #121826; }
-        .page { max-width: 1100px; margin: 0 auto; padding: 20px; }
-        .top-bar { display: flex; justify-content: space-between; align-items: center; background: #ffffff; border-radius: 14px; padding: 18px 20px; margin-bottom: 18px; box-shadow: 0 6px 24px rgba(17, 24, 39, 0.06); }
-        .top-bar h1 { margin: 0; font-size: 1.45rem; }
-        .top-bar p { margin: 2px 0 0; color: #6b7280; font-size: 0.92rem; }
-        .section-card { background: #ffffff; border-radius: 14px; padding: 18px; margin-bottom: 18px; box-shadow: 0 6px 24px rgba(17, 24, 39, 0.06); }
-        .section-card h3 { margin-top: 0; }
-        .hero { display: flex; justify-content: space-between; gap: 24px; align-items: center; }
-        .hero h2 { margin-top: 0; font-size: 1.5rem; }
-        .hero p { color: #4b5563; max-width: 620px; }
-        .hero-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 220px; }
-        .hero-stats div { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; text-align: center; }
-        .hero-stats strong { display: block; font-size: 1.4rem; }
-        .hero-stats span { color: #6b7280; font-size: 0.82rem; }
-        .category-row, .dashboard-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
-        .chip { border: 1px solid #cbd5e1; background: #fff; border-radius: 999px; padding: 8px 12px; cursor: pointer; }
-        .active-chip { background: #111827; color: #fff; border-color: #111827; }
-        .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-        .menu-card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fcfcfd; }
-        .menu-card h4 { margin: 0; }
-        .menu-card p { color: #4b5563; margin: 10px 0; }
-        .menu-header, .menu-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-        .menu-footer small { color: #6b7280; }
-        .tag { border-radius: 999px; font-size: 0.75rem; padding: 4px 8px; font-weight: 600; }
-        .available { background: #dcfce7; color: #166534; }
-        .unavailable { background: #fee2e2; color: #991b1b; }
-        .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-        .form-grid label, .stacked-form label { display: flex; flex-direction: column; gap: 5px; color: #374151; font-size: 0.9rem; }
-        .full-width { grid-column: 1 / -1; }
-        input, textarea, select { border: 1px solid #d1d5db; border-radius: 10px; padding: 10px 11px; font: inherit; background: #fff; }
-        textarea { resize: vertical; }
-        .primary-btn, .secondary-btn, .small-btn { border: none; border-radius: 10px; padding: 10px 12px; cursor: pointer; font-weight: 600; }
-        .primary-btn { background: #111827; color: #fff; }
-        .secondary-btn, .small-btn { background: #e5e7eb; color: #111827; }
-        .danger { background: #fee2e2; color: #991b1b; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
-        .stat-card { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; }
-        .stat-card h4 { margin: 0 0 4px; font-size: 0.92rem; color: #475569; }
-        .stat-card strong { font-size: 1.4rem; }
-        .admin-grid { display: grid; grid-template-columns: 320px 1fr; gap: 12px; }
-        .stacked-form { display: flex; flex-direction: column; gap: 10px; }
-        .list-panel { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; background: #fff; }
-        .list-panel h4 { margin-top: 0; }
-        .list-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
-        .list-row:last-child { border-bottom: none; }
-        .list-row p { margin: 3px 0; color: #4b5563; font-size: 0.9rem; }
-        .row-actions { display: flex; align-items: center; gap: 8px; }
-        .modal-overlay { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.45); display: grid; place-items: center; padding: 16px; }
-        .modal-card { width: 100%; max-width: 380px; background: #fff; border-radius: 12px; padding: 16px; }
-        .modal-card h3 { margin: 0; }
-        .modal-card p { margin-top: 6px; color: #6b7280; }
-        .modal-card small { display: block; margin-top: 8px; color: #6b7280; }
-        .error-text { color: #b91c1c; margin: 0; font-size: 0.85rem; }
-        .notice { background: #eef2ff; color: #312e81; border: 1px solid #c7d2fe; border-radius: 10px; padding: 10px 12px; margin: 0 0 18px; }
-        .max-form-width { max-width: 420px; }
-
-        @media (max-width: 860px) {
-          .hero { flex-direction: column; align-items: flex-start; }
-          .hero-stats { width: 100%; }
-          .admin-grid { grid-template-columns: 1fr; }
-        }
-
-        @media (max-width: 700px) {
-          .form-grid { grid-template-columns: 1fr; }
-          .top-bar { flex-direction: column; align-items: flex-start; gap: 12px; }
-          .top-actions { width: 100%; }
-          .top-actions button { width: 100%; }
-        }
-      `}</style>
     </div>
   );
 };
