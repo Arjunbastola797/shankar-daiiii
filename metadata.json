@@ -1,0 +1,8 @@
+{
+  "name": "Ghamau Nepal",
+  "description": "A premium travel companion for exploring Nepal's trekking trails, cultural heritage, and adventure destinations, powered by Gemini AI for personalized itineraries.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
+}
